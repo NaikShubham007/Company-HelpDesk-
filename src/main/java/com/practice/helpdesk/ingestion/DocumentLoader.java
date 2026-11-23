@@ -11,12 +11,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DocumentLoader {
 
+    private static final Logger log = LoggerFactory.getLogger(DocumentLoader.class);
     private static final String DELIMITER = "---";
     private static final List<String> REQUIRED_KEYS = List.of("title", "department", "owner", "last_updated");
 
@@ -28,11 +31,14 @@ public class DocumentLoader {
 
     public List<KnowledgeDocument> load() {
         try (Stream<Path> paths = Files.walk(knowledgeBaseDir)) {
-            return paths
+            List<KnowledgeDocument> documents = paths
                     .filter(path -> Files.isRegularFile(path) && path.toString().endsWith(".md"))
                     .sorted()
                     .map(this::readDocument)
                     .toList();
+            log.info("Loaded {} documents from {}", documents.size(), knowledgeBaseDir);
+            documents.forEach(document -> log.info("  {} | {}", document.sourcePath(), document.title()));
+            return documents;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
