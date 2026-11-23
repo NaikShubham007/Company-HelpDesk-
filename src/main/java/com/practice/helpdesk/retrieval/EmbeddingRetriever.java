@@ -27,15 +27,21 @@ public class EmbeddingRetriever {
     }
 
     private static List<float[]> buildIndex(EmbeddingModel embeddingModel, List<Chunk> chunks) {
-        log.info("Building embedding index for {} chunks (happens once, on the first question)", chunks.size());
+        int characters = chunks.stream().mapToInt(chunk -> chunk.text().length()).sum();
+        log.info("Ollama embed call for the index: {} chunks, {} characters (happens once, on the first question)",
+                chunks.size(), characters);
         long start = System.nanoTime();
         List<float[]> vectors = embeddingModel.embed(chunks.stream().map(Chunk::text).toList());
-        log.info("Embedding index ready in {} ms", (System.nanoTime() - start) / 1_000_000);
+        log.info("Ollama embed call finished in {} ms: {} vectors of {} numbers each",
+                (System.nanoTime() - start) / 1_000_000, vectors.size(), vectors.get(0).length);
         return vectors;
     }
 
     public List<RetrievedChunk> search(String question, int topK) {
+        log.info("Ollama embed call for the question: {} characters", question.length());
+        long start = System.nanoTime();
         float[] questionVector = embeddingModel.embed(question);
+        log.info("Ollama embed call finished in {} ms", (System.nanoTime() - start) / 1_000_000);
         List<RetrievedChunk> results = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
             double score = cosineSimilarity(questionVector, chunkVectors.get(i));

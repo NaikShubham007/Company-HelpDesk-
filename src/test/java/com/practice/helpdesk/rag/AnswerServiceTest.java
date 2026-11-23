@@ -30,7 +30,7 @@ class AnswerServiceTest {
         ChatClient.Builder builder = mock(ChatClient.Builder.class);
         when(builder.build()).thenReturn(chatClient);
 
-        Answer answer = new AnswerService(retriever, builder).ask("How do I connect?");
+        Answer answer = new AnswerService(retriever, builder, "llama3.1").ask("How do I connect?");
 
         assertThat(answer.text()).isEqualTo("Connect the VPN first [1].");
         assertThat(answer.sources()).isEqualTo(sources);

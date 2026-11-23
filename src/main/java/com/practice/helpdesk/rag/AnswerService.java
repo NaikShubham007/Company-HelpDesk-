@@ -5,6 +5,7 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
@@ -19,10 +20,15 @@ public class AnswerService {
 
     private final EmbeddingRetriever retriever;
     private final ChatClient chatClient;
+    private final String chatModel;
 
-    public AnswerService(@Lazy EmbeddingRetriever retriever, ChatClient.Builder chatClientBuilder) {
+    public AnswerService(
+            @Lazy EmbeddingRetriever retriever,
+            ChatClient.Builder chatClientBuilder,
+            @Value("${spring.ai.ollama.chat.options.model}") String chatModel) {
         this.retriever = retriever;
         this.chatClient = chatClientBuilder.build();
+        this.chatModel = chatModel;
     }
 
     public Answer ask(String question) {
@@ -36,14 +42,25 @@ public class AnswerService {
             log.info("  [{}] {} score={}", i + 1, source.chunk().sourcePath(), "%.3f".formatted(source.score()));
         }
 
-        log.info("Sending the question and passages to the chat model");
+        String systemMessage = PromptBuilder.SYSTEM_INSTRUCTIONS;
+        String userMessage = PromptBuilder.userMessage(question, sources);
+        log.info("Ollama chat call: model={}, system message {} characters, user message {} characters",
+                chatModel, systemMessage.length(), userMessage.length());
+
         long chatStart = System.nanoTime();
-        String text = chatClient.prompt()
-                .system(PromptBuilder.SYSTEM_INSTRUCTIONS)
-                .user(PromptBuilder.userMessage(question, sources))
-                .call()
-                .content();
-        log.info("Answer received in {} ms: {}", (System.nanoTime() - chatStart) / 1_000_000, text);
+        String text;
+        try {
+            text = chatClient.prompt()
+                    .system(systemMessage)
+                    .user(userMessage)
+                    .call()
+                    .content();
+        } catch (RuntimeException e) {
+            log.error("Ollama chat call failed for model {}: {}. Check that the model appears in 'ollama list'.",
+                    chatModel, e.getMessage());
+            throw e;
+        }
+        log.info("Ollama chat call finished in {} ms: {}", (System.nanoTime() - chatStart) / 1_000_000, text);
         return new Answer(text, sources);
     }
 }
