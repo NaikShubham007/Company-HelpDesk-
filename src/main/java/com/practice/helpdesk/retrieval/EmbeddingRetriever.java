@@ -4,11 +4,15 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.EmbeddingModel;
 
 import com.practice.helpdesk.ingestion.Chunk;
 
 public class EmbeddingRetriever {
+
+    private static final Logger log = LoggerFactory.getLogger(EmbeddingRetriever.class);
 
     private final EmbeddingModel embeddingModel;
     private final List<Chunk> chunks;
@@ -19,7 +23,15 @@ public class EmbeddingRetriever {
         this.chunks = List.copyOf(chunks);
         this.chunkVectors = this.chunks.isEmpty()
                 ? List.of()
-                : embeddingModel.embed(this.chunks.stream().map(Chunk::text).toList());
+                : buildIndex(embeddingModel, this.chunks);
+    }
+
+    private static List<float[]> buildIndex(EmbeddingModel embeddingModel, List<Chunk> chunks) {
+        log.info("Building embedding index for {} chunks (happens once, on the first question)", chunks.size());
+        long start = System.nanoTime();
+        List<float[]> vectors = embeddingModel.embed(chunks.stream().map(Chunk::text).toList());
+        log.info("Embedding index ready in {} ms", (System.nanoTime() - start) / 1_000_000);
+        return vectors;
     }
 
     public List<RetrievedChunk> search(String question, int topK) {

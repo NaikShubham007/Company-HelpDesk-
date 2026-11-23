@@ -57,6 +57,29 @@ class TextChunkerTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    void startsANewChunkAtEachHeadingAndKeepsTheHeadingWithItsText() {
+        TextChunker chunker = new TextChunker(100, 20);
+
+        List<Chunk> chunks = chunker.chunk(document("# Policy\n\n## Leave\nGet 20 days.\n\n## Sick\nGet 10 days."));
+
+        assertThat(chunks).extracting(Chunk::text).containsExactly(
+                "Leave Get 20 days.",
+                "Sick Get 10 days.");
+        assertThat(chunks).extracting(Chunk::index).containsExactly(0, 1);
+    }
+
+    @Test
+    void splitsALongSectionIntoOverlappingWindows() {
+        TextChunker chunker = new TextChunker(4, 1);
+
+        List<Chunk> chunks = chunker.chunk(document("## Long\nw1 w2 w3 w4 w5"));
+
+        assertThat(chunks).extracting(Chunk::text).containsExactly(
+                "Long w1 w2 w3",
+                "w3 w4 w5");
+    }
+
     private KnowledgeDocument document(String body) {
         return new KnowledgeDocument("it/vpn.md", "VPN Access", "IT", "IT Service Desk", "2026-11-01", body);
     }
